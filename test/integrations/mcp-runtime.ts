@@ -5,7 +5,8 @@ import { createAgentObserver } from "../../src/agent/observer.js"
 import { MCP_CONFIG } from "../../src/config.js"
 import { createMcpServerFactory } from "../../src/mcp/server-factory.js"
 import { startMcpHttpServer as startMcpHttpServerRaw } from "../../src/server/http-server.js"
-import { connectClient, startMcpHttpServer, toolText } from "./helpers.js"
+import { isApplyPatchSupported } from "../../src/tools/apply-patch/apply-patch.js"
+import { connectClient, shellPrint, startMcpHttpServer, toolText } from "./helpers.js"
 
 test("publishes the assembled MCP tool surface", { timeout: 10_000 }, async (t) => {
   const running = await startMcpHttpServer()
@@ -28,7 +29,7 @@ test("publishes the assembled MCP tool surface", { timeout: 10_000 }, async (t) 
       "start_here",
       "bash",
       "terminal",
-      "apply_patch",
+      ...(isApplyPatchSupported() ? ["apply_patch"] : []),
       "file_read",
       "file_write",
       "file_edit",
@@ -172,7 +173,7 @@ test("one HTTP observer drives dashboard state and tool observation", {
     name: "start_here",
     arguments: { mode: "general", task_id: "observer-composition" },
   })
-  await connected.client.callTool({ name: "bash", arguments: { command: "printf observed" } })
+  await connected.client.callTool({ name: "bash", arguments: { command: shellPrint("observed") } })
 
   const response = await fetch(`http://${running.host}:${running.port}/ui/api/agents`)
   assert.equal(response.status, 200)
@@ -245,7 +246,7 @@ test("publishes ordinary tool results only through the compact MCP surface", {
 
   const result = await connected.client.callTool({
     name: "bash",
-    arguments: { command: "printf compact" },
+    arguments: { command: shellPrint("compact") },
   })
   assert.equal(result.structuredContent, undefined)
   assert.match(toolText(result), /output=compact/u)
@@ -259,7 +260,7 @@ test("preserves structured tool output when configured", { timeout: 10_000 }, as
 
   const result = await connected.client.callTool({
     name: "bash",
-    arguments: { command: "printf structured" },
+    arguments: { command: shellPrint("structured") },
   })
   assert.ok(result.structuredContent)
   assert.equal((result.structuredContent as { output: string }).output, "structured")

@@ -1,0 +1,23 @@
+{
+  "name": "Local Agents",
+  "description": "Local Hermes and Antigravity delegation tools with Hermes-first fallback routing.",
+  "enabled": true,
+  "tools": {
+    "hermes_ask": {
+      "enabled": true,
+      "description": "Delegate a complex local coding, review, or analysis task to the installed Hermes Agent in one-shot mode.",
+      "required": false
+    },
+    "agy_ask": {
+      "enabled": true,
+      "description": "Delegate a local task to the installed Antigravity/AGY CLI in non-interactive print mode.",
+      "required": false
+    },
+    "smart_delegate": {
+      "enabled": true,
+      "description": "Try Hermes first for a complex local task and fall back to AGY only if the Hermes process fails.",
+      "required": false
+    }
+  },
+  "skills": {}
+}

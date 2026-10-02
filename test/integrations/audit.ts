@@ -5,7 +5,7 @@ import { join } from "node:path"
 import test from "node:test"
 
 import { McpAuditLogger } from "../../src/server/audit/audit-log.js"
-import { connectClient, startMcpHttpServer } from "./helpers.js"
+import { connectClient, shellPrint, startMcpHttpServer } from "./helpers.js"
 
 test("audits tool calls made through the HTTP MCP boundary", { timeout: 10_000 }, async (t) => {
   const root = await mkdtemp(join(tmpdir(), "mcp-audit-integration-"))
@@ -31,7 +31,7 @@ test("audits tool calls made through the HTTP MCP boundary", { timeout: 10_000 }
     name: "start_here",
     arguments: { mode: "general", task_id: "audit-integration" },
   })
-  await connected.client.callTool({ name: "bash", arguments: { command: "printf audit" } })
+  await connected.client.callTool({ name: "bash", arguments: { command: shellPrint("audit") } })
   await connected.client.callTool({
     name: "skill_search",
     arguments: { query: "create skill" },

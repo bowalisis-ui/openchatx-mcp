@@ -7,6 +7,7 @@ import {
   connectClient,
   connectLegacyClient,
   postWithHost,
+  shellPrint,
   startMcpHttpServer,
   toolText,
 } from "./helpers.js"
@@ -37,7 +38,7 @@ test("continues serving an existing client after an HTTP server restart", {
 
   const before = await connection.client.callTool({
     name: "bash",
-    arguments: { command: "printf before" },
+    arguments: { command: shellPrint("before") },
   })
   assert.equal(compactField(toolText(before), "output"), "before")
   await firstServer.close()
@@ -47,7 +48,7 @@ test("continues serving an existing client after an HTTP server restart", {
     try {
       after = await connection.client.callTool({
         name: "bash",
-        arguments: { command: "printf after" },
+        arguments: { command: shellPrint("after") },
       })
       break
     } catch (error) {
