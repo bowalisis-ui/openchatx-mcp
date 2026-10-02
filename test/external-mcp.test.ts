@@ -4,6 +4,7 @@ import { createServer } from "node:net"
 import { join } from "node:path"
 import process from "node:process"
 import test from "node:test"
+import { fileURLToPath } from "node:url"
 
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client"
 import { McpServer } from "@modelcontextprotocol/server"
@@ -27,7 +28,7 @@ const NO_BUILTINS = {
 test("aggregates a local stdio MCP and forwards tool calls", { timeout: 10_000 }, async (t) => {
   const root = await tempDir(t, "shellby-external-stdio-")
   const configPath = join(root, "mcp-servers.json")
-  const fixturePath = new URL("../fixtures/external-mcp-stdio.mjs", import.meta.url).pathname
+  const fixturePath = fileURLToPath(new URL("../fixtures/external-mcp-stdio.mjs", import.meta.url))
   await writeFile(
     configPath,
     JSON.stringify({
@@ -78,7 +79,7 @@ test("external MCP registry hot-reloads direct config file edits", {
 }, async (t) => {
   const root = await tempDir(t, "openchatx-external-watch-")
   const configPath = join(root, "mcp-servers.json")
-  const fixturePath = new URL("../fixtures/external-mcp-stdio.mjs", import.meta.url).pathname
+  const fixturePath = fileURLToPath(new URL("../fixtures/external-mcp-stdio.mjs", import.meta.url))
   await writeFile(configPath, "{}")
 
   const registry = await createExternalMcpRegistry(configPath)

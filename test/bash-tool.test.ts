@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import { access, mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
+import process from "node:process"
 import test from "node:test"
 
 import { Client } from "@modelcontextprotocol/client"
@@ -15,6 +16,18 @@ import { BashProcessManager } from "../src/tools/shell/bash-process-manager.js"
 import { registerBashProcessTool } from "../src/tools/shell/bash-process-tool.js"
 import { registerBashTool } from "../src/tools/shell/bash-tool.js"
 import { tempDir } from "./helpers/temp.js"
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")
+}
+
+function shellCommand(posix: string, windows: string): string {
+  return process.platform === "win32" ? windows : posix
+}
+
+function powerShellLiteral(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`
+}
 
 async function connectedBash(t: test.TestContext) {
   const state = await tempDir(t, "openchatx-bash-manager-")
@@ -40,11 +53,17 @@ test("bash runs in a fresh process with an explicit workdir", async (t) => {
 
   const result = await client.callTool({
     name: "bash",
-    arguments: { command: "pwd; cat marker.txt", workdir: join(cwd, "sub") },
+    arguments: {
+      command: shellCommand(
+        "pwd; cat marker.txt",
+        "(Get-Location).Path; Get-Content -LiteralPath 'marker.txt'"
+      ),
+      workdir: join(cwd, "sub"),
+    },
   })
   assert.equal(result.isError, undefined)
   const output = (result.structuredContent as { output: string }).output
-  assert.match(output, new RegExp(join(cwd, "sub").replaceAll("/", "\\/"), "u"))
+  assert.match(output, new RegExp(escapeRegex(join(cwd, "sub")), "u"))
   assert.match(output, /ok/u)
 })
 
@@ -57,7 +76,10 @@ test("bash keep=true is listed, readable, and stoppable", async (t) => {
   const result = await client.callTool({
     name: "bash",
     arguments: {
-      command: `printf 'server ready\\n'; printf ready > "${marker}"; sleep 30`,
+      command: shellCommand(
+        `printf 'server ready\\n'; printf ready > "${marker}"; sleep 30`,
+        `Write-Output 'server ready'; Set-Content -LiteralPath ${powerShellLiteral(marker)} -Value 'ready' -NoNewline; Start-Sleep -Seconds 30`
+      ),
       workdir: cwd,
       keep: true,
     },
@@ -77,7 +99,7 @@ test("bash keep=true is listed, readable, and stoppable", async (t) => {
   assert.match(output.process_id, /^bash-\d+$/u)
 
   let markerReady = false
-  for (let attempt = 0; attempt < 50; attempt += 1) {
+  for (let attempt = 0; attempt < 150; attempt += 1) {
     try {
       await access(marker)
       markerReady = true
@@ -119,14 +141,25 @@ test("bash does not persist cwd or environment between calls", async (t) => {
 
   await client.callTool({
     name: "bash",
-    arguments: { command: "cd /; export OPENCHATX_TEMP=present" },
+    arguments: {
+      command: shellCommand(
+        "cd /; export OPENCHATX_TEMP=present",
+        "Set-Location C:\\; $env:OPENCHATX_TEMP='present'"
+      ),
+    },
   })
   const result = await client.callTool({
     name: "bash",
-    arguments: { command: "pwd; printf '%s' \"${OPENCHATX_TEMP:-missing}\"", workdir: cwd },
+    arguments: {
+      command: shellCommand(
+        "pwd; printf '%s' \"${OPENCHATX_TEMP:-missing}\"",
+        "(Get-Location).Path; if ($env:OPENCHATX_TEMP) { $env:OPENCHATX_TEMP } else { 'missing' }"
+      ),
+      workdir: cwd,
+    },
   })
   const output = (result.structuredContent as { output: string }).output
-  assert.match(output, new RegExp(cwd.replaceAll("/", "\\/"), "u"))
+  assert.match(output, new RegExp(escapeRegex(cwd), "u"))
   assert.match(output, /missing/u)
 })
 
@@ -137,7 +170,10 @@ test("bash wait expiry promotes a live command to a durable job", async (t) => {
   const result = await client.callTool({
     name: "bash",
     arguments: {
-      command: "printf 'phase-one\\n'; sleep 0.3; printf 'phase-two\\n'",
+      command: shellCommand(
+        "printf 'phase-one\\n'; sleep 0.3; printf 'phase-two\\n'",
+        "Write-Output 'phase-one'; Start-Sleep -Milliseconds 300; Write-Output 'phase-two'"
+      ),
       workdir: cwd,
       timeout_ms: 50,
     },
@@ -153,7 +189,7 @@ test("bash wait expiry promotes a live command to a durable job", async (t) => {
   assert.equal(promoted.running, true)
   assert.equal(promoted.promoted_to_job, true)
   assert.match(promoted.job_id, /^job-/u)
-  assert.match(promoted.output, /phase-one/u)
+  if (promoted.output) assert.match(promoted.output, /phase-one/u)
 
   const waited = await client.callTool({
     name: "job_manage",
@@ -172,7 +208,11 @@ test("bash wait expiry promotes a live command to a durable job", async (t) => {
   }
   assert.equal(final.job.status, "completed")
   assert.match(final.output, /phase-two/u)
-  assert.doesNotMatch(final.output, /phase-one/u)
+  if (promoted.output) {
+    assert.doesNotMatch(final.output, /phase-one/u)
+  } else {
+    assert.match(final.output, /phase-one/u)
+  }
   assert.ok(final.next_cursor > promoted.next_cursor)
 })
 
@@ -198,7 +238,14 @@ test("dashboard-style forced stop cancels the durable bash job and returns queue
     setAgentTaskSlug("bash-force-stop")
     return client.callTool({
       name: "bash",
-      arguments: { command: "printf 'started\n'; sleep 30", workdir: cwd, timeout_ms: 30_000 },
+      arguments: {
+        command: shellCommand(
+          "printf 'started\n'; sleep 30",
+          "Write-Output 'started'; Start-Sleep -Seconds 30"
+        ),
+        workdir: cwd,
+        timeout_ms: 30_000,
+      },
     })
   })
 

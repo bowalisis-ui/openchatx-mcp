@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import { chmod, readFile, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
+import process from "node:process"
 import test, { type TestContext } from "node:test"
 
 import { getAgentIdentity, runWithAgent, setAgentTaskSlug } from "../../src/agent/context.js"
@@ -359,12 +360,16 @@ test("creates and repairs audit logs with owner-only permissions", async (t) => 
   })
   assert.ok(call)
   call.finish({ httpStatus: 200, state: "finished" })
-  assert.equal((await stat(newFile)).mode & 0o777, 0o600)
+  if (process.platform !== "win32") {
+    assert.equal((await stat(newFile)).mode & 0o777, 0o600)
+  }
 
   await writeFile(existingFile, "existing\n")
   await chmod(existingFile, 0o644)
   assert.ok(new McpAuditLogger(existingFile))
-  assert.equal((await stat(existingFile)).mode & 0o777, 0o600)
+  if (process.platform !== "win32") {
+    assert.equal((await stat(existingFile)).mode & 0o777, 0o600)
+  }
   assert.equal(await readFile(existingFile, "utf8"), "existing\n")
 })
 

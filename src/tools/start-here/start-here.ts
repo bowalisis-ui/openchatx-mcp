@@ -210,11 +210,19 @@ export async function buildStartHereInstructions(
   template?: string,
   context: Partial<Omit<StartHereTemplateContext, "mode" | "modeInstructions">> = {}
 ): Promise<string> {
-  const [selected, agentTemplate] = await Promise.all([
+  let agentTemplate: Promise<string>
+  if (template !== undefined) {
+    agentTemplate = Promise.resolve(template)
+  } else if (root === repositoryRoot) {
+    agentTemplate = readAgentInstructionsTemplate()
+  } else {
+    agentTemplate = readBundledAgentTemplate(root)
+  }
+  const [selected, resolvedTemplate] = await Promise.all([
     readStartPrompt(mode, root),
-    template === undefined ? readBundledAgentTemplate(root) : Promise.resolve(template),
+    agentTemplate,
   ])
-  const rendered = renderStartHereTemplate(agentTemplate, {
+  const rendered = renderStartHereTemplate(resolvedTemplate, {
     mode,
     taskId: context.taskId ?? "",
     modeInstructions: selected.prompt.trim(),

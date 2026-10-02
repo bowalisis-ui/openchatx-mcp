@@ -136,12 +136,14 @@ export class JobManager {
   async list(): Promise<DurableJob[]> {
     await this.ensureLoaded()
     await this.reconcile()
+    await this.persistChain
     return [...this.jobs.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   }
 
   async get(id: string): Promise<DurableJob> {
     await this.ensureLoaded()
     await this.reconcile()
+    await this.persistChain
     const job = this.jobs.get(id)
     if (!job) throw new Error(`Unknown durable job ${JSON.stringify(id)}.`)
     return { ...job }
@@ -354,12 +356,14 @@ export class JobManager {
   }
 
   private async persist(): Promise<void> {
-    await mkdir(this.root, { recursive: true, mode: 0o700 })
     const payload = { jobs: [...this.jobs.values()] }
     const serialized = `${JSON.stringify(payload, null, 2)}\n`
     const pending = this.persistChain
       .catch(() => undefined)
-      .then(() => this.writeStateAtomically(serialized))
+      .then(async () => {
+        await mkdir(this.root, { recursive: true, mode: 0o700 })
+        await this.writeStateAtomically(serialized)
+      })
     this.persistChain = pending
     await pending
   }
@@ -375,7 +379,18 @@ export class JobManager {
         encoding: "utf8",
         mode: 0o600,
       })
-      await rename(tempPath, this.statePath)
+      for (let attempt = 0; ; attempt += 1) {
+        try {
+          await rename(tempPath, this.statePath)
+          break
+        } catch (error) {
+          const retryable =
+            process.platform === "win32" &&
+            (isNodeErrorCode(error, "EPERM") || isNodeErrorCode(error, "EACCES"))
+          if (!retryable || attempt >= 4) throw error
+          await delay(20 * (attempt + 1))
+        }
+      }
     } catch (error) {
       await rm(tempPath, { force: true }).catch(() => undefined)
       throw error

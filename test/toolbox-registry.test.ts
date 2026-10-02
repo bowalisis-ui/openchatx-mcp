@@ -9,6 +9,7 @@ import { InMemoryTransport, McpServer } from "@modelcontextprotocol/server"
 
 import { createMcpServerFactory } from "../src/mcp/server-factory.js"
 import { ToolboxRegistry } from "../src/toolbox/registry.js"
+import { isApplyPatchSupported } from "../src/tools/apply-patch/apply-patch.js"
 import { tempDir } from "./helpers/temp.js"
 
 test("loads a custom TypeScript toolbox tool and exposes it through MCP", async (t) => {
@@ -208,7 +209,7 @@ test("built-in tools are filtered by toolbox settings instead of legacy tool fla
 
   const names = (await client.listTools()).tools.map((tool) => tool.name).sort()
   assert.ok(names.includes("start_here"))
-  assert.ok(names.includes("apply_patch"))
+  assert.equal(names.includes("apply_patch"), isApplyPatchSupported())
   assert.ok(!names.includes("file_read"))
   assert.ok(!names.includes("file_write"))
 })

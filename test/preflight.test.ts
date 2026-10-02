@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
 import { copyFile, mkdir, readFile, realpath, symlink, writeFile } from "node:fs/promises"
-import { join } from "node:path"
+import { delimiter, join } from "node:path"
 import process from "node:process"
 import test from "node:test"
 import { fileURLToPath } from "node:url"
@@ -28,12 +28,16 @@ test("requires RTK only when shell.rtk is enabled", () => {
   assert.equal(checkRtkRuntime(false, undefined), undefined)
   const missingRtk = checkRtkRuntime(true, undefined)
   assert.ok(missingRtk)
-  assert.match(missingRtk, /brew install rtk/u)
+  assert.match(
+    missingRtk,
+    process.platform === "win32" ? /not supported on Windows/u : /brew install rtk/u
+  )
 })
 
 test("preflight and full setup require a configured OpenAI tunnel-client profile", async (t) => {
   const root = await realpath(await tempDir(t, "openchatx-tunnel-setup-"))
-  for (const dir of ["scripts", "src/state", "src/tools/start-here", ".openchatx", "bin"])
+  const binDir = "bin with spaces"
+  for (const dir of ["scripts", "src/state", "src/tools/start-here", ".openchatx", binDir])
     await mkdir(join(root, dir), { recursive: true })
   for (const path of [
     "scripts/setup.ts",
@@ -51,24 +55,36 @@ test("preflight and full setup require a configured OpenAI tunnel-client profile
   }
   await symlink(
     fileURLToPath(new URL("../node_modules", import.meta.url)),
-    join(root, "node_modules")
+    join(root, "node_modules"),
+    process.platform === "win32" ? "junction" : "dir"
   )
   await writeFile(join(root, "package.json"), JSON.stringify({ type: "module", version: "0.0.0" }))
-  await writeFile(
-    join(root, "bin/npm"),
-    `#!${process.execPath}\nconsole.log("fixture build complete")\n`,
-    { mode: 0o755 }
-  )
-  await writeFile(
-    join(root, "bin/tunnel-client"),
-    `#!${process.execPath}
+  if (process.platform === "win32") {
+    await writeFile(
+      join(root, binDir, "npm.cmd"),
+      `@echo off\r\n"${process.execPath}" -e "console.log('fixture build complete')"\r\n`
+    )
+    await writeFile(
+      join(root, binDir, "tunnel-client.cmd"),
+      '@echo off\r\nif "%~1"=="profiles" if "%~2"=="list" echo [{"name":"openchatx"}]\r\nexit /b 0\r\n'
+    )
+  } else {
+    await writeFile(
+      join(root, binDir, "npm"),
+      `#!${process.execPath}\nconsole.log("fixture build complete")\n`,
+      { mode: 0o755 }
+    )
+    await writeFile(
+      join(root, binDir, "tunnel-client"),
+      `#!${process.execPath}
 const args = process.argv.slice(2)
 if (args[0] === "profiles" && args[1] === "list") {
   console.log(JSON.stringify([{ name: "openchatx" }]))
 }
 `,
-    { mode: 0o755 }
-  )
+      { mode: 0o755 }
+    )
+  }
 
   const configPath = join(root, ".openchatx/config.toml")
   const source = [
@@ -88,7 +104,7 @@ if (args[0] === "profiles" && args[1] === "list") {
         env: {
           ...process.env,
           OPENCHATX_PUBLIC_CONFIG: configPath,
-          PATH: join(root, "bin"),
+          PATH: [join(root, binDir), process.env.PATH ?? ""].filter(Boolean).join(delimiter),
           CONTROL_PLANE_API_KEY: "test-key",
         },
         timeout: 15_000,
