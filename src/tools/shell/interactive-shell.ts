@@ -146,9 +146,15 @@ export class InteractiveShellManager {
     const session = this.requireSession(id)
     this.sessions.delete(id)
     if (session.status === "running") {
-      session.pty.kill("SIGTERM")
-      await waitForExit(session, MCP_CONFIG.shell.stopGraceMs)
-      if (session.status === "running") session.pty.kill("SIGKILL")
+      if (process.platform === "win32") {
+        session.pty.kill()
+        await waitForExit(session, MCP_CONFIG.shell.stopGraceMs)
+        if (session.status === "running") session.pty.kill()
+      } else {
+        session.pty.kill("SIGTERM")
+        await waitForExit(session, MCP_CONFIG.shell.stopGraceMs)
+        if (session.status === "running") session.pty.kill("SIGKILL")
+      }
     }
   }
 

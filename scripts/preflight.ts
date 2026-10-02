@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process"
+import { type SpawnSyncReturns, spawnSync } from "node:child_process"
 import { constants, existsSync } from "node:fs"
 import { access } from "node:fs/promises"
 import { join } from "node:path"
@@ -69,7 +69,7 @@ export async function checkPublicRuntime(
 function checkTunnelClient(tunnelProfile: string, platform: NodeJS.Platform): string[] {
   const errors: string[] = []
   const executable = resolvePathExecutable("tunnel-client", platform) ?? "tunnel-client"
-  const check = spawnSync(executable, ["--help"], { encoding: "utf8", windowsHide: true })
+  const check = spawnTunnelClient(executable, ["--help"], platform)
 
   if (hasErrorCode(check.error, "ENOENT")) {
     return [
@@ -82,10 +82,7 @@ function checkTunnelClient(tunnelProfile: string, platform: NodeJS.Platform): st
     return [`tunnel-client could not run${check.stderr?.trim() ? `: ${check.stderr.trim()}` : "."}`]
   }
 
-  const profiles = spawnSync(executable, ["profiles", "list", "--json"], {
-    encoding: "utf8",
-    windowsHide: true,
-  })
+  const profiles = spawnTunnelClient(executable, ["profiles", "list", "--json"], platform)
   if (profiles.status !== 0 || !profiles.stdout.includes(`"${tunnelProfile}"`)) {
     errors.push(
       `tunnel-client profile "${tunnelProfile}" is missing. Initialize it with tunnel-client init --profile ${tunnelProfile} --tunnel-id <tunnel_id> --mcp-server-url http://127.0.0.1:8001/mcp (or use the port configured in openchatx.toml).`
@@ -97,6 +94,25 @@ function checkTunnelClient(tunnelProfile: string, platform: NodeJS.Platform): st
     )
   }
   return errors
+}
+
+function spawnTunnelClient(
+  executable: string,
+  args: readonly string[],
+  platform: NodeJS.Platform
+): SpawnSyncReturns<string> {
+  if (platform === "win32" && /\.(?:cmd|bat)$/iu.test(executable)) {
+    const commandLine = [
+      `"${executable.replaceAll('"', '""')}"`,
+      ...args.map((arg) => `"${arg.replaceAll('"', '""')}"`),
+    ].join(" ")
+    return spawnSync(commandLine, {
+      encoding: "utf8",
+      windowsHide: true,
+      shell: process.env.ComSpec ?? true,
+    })
+  }
+  return spawnSync(executable, [...args], { encoding: "utf8", windowsHide: true })
 }
 
 export function isSupportedNodeVersion(version: string): boolean {

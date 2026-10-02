@@ -16,7 +16,7 @@ import {
   readStartPrompt,
   renderStartHereTemplate,
 } from "../../src/tools/start-here/start-here.js"
-import { connectClient, startMcpHttpServer, toolText } from "./helpers.js"
+import { connectClient, shellPrint, startMcpHttpServer, toolText } from "./helpers.js"
 
 test("renders editable AGENTS.md placeholders into start_here output", () => {
   const rendered = renderStartHereTemplate(
@@ -310,7 +310,7 @@ test("requires start_here once per ChatGPT session", { timeout: 10_000 }, async 
 
   const blocked = await first.client.callTool({
     name: "bash",
-    arguments: { command: "printf blocked" },
+    arguments: { command: shellPrint("blocked") },
   })
   assert.equal(blocked.isError, true)
   assert.match(blocked.content.find((item) => item.type === "text")?.text ?? "", /start_here/u)
@@ -329,13 +329,13 @@ test("requires start_here once per ChatGPT session", { timeout: 10_000 }, async 
 
   const allowed = await first.client.callTool({
     name: "bash",
-    arguments: { command: "printf allowed" },
+    arguments: { command: shellPrint("allowed") },
   })
   assert.equal(allowed.isError, undefined)
 
   const stillBlocked = await second.client.callTool({
     name: "bash",
-    arguments: { command: "printf blocked" },
+    arguments: { command: shellPrint("blocked") },
   })
   assert.equal(stillBlocked.isError, true)
 })
@@ -568,7 +568,7 @@ test("keeps a ChatGPT session locked when start_here fails", { timeout: 10_000 }
 
   const blocked = await connected.client.callTool({
     name: "bash",
-    arguments: { command: "printf blocked" },
+    arguments: { command: shellPrint("blocked") },
   })
   assert.equal(blocked.isError, true)
   assert.match(blocked.content.find((item) => item.type === "text")?.text ?? "", /start_here/u)
@@ -580,7 +580,7 @@ test("keeps a ChatGPT session locked when start_here fails", { timeout: 10_000 }
   assert.equal(toolText(retry), await buildStartHereInstructions("coding"))
   const allowed = await connected.client.callTool({
     name: "bash",
-    arguments: { command: "printf allowed" },
+    arguments: { command: shellPrint("allowed") },
   })
   assert.equal(allowed.isError, undefined)
 })
@@ -595,7 +595,7 @@ test("does not require start_here when no ChatGPT session is provided", {
 
   const result = await connected.client.callTool({
     name: "bash",
-    arguments: { command: "printf local" },
+    arguments: { command: shellPrint("local") },
   })
   assert.equal(result.isError, undefined)
 
