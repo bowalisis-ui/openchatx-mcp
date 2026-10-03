@@ -1,4 +1,5 @@
 import { request as httpRequest } from "node:http"
+import process from "node:process"
 
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client"
 import type { AgentObserver } from "../../src/agent/observer.js"
@@ -146,6 +147,13 @@ export function postWithHost(url: string, host: string, value: unknown): Promise
     request.once("error", reject)
     request.end(body)
   })
+}
+
+export function shellPrint(value: string): string {
+  if (process.platform === "win32") {
+    return `[Console]::Out.Write('${value.replaceAll("'", "''")}')`
+  }
+  return `printf '%s' '${value.replaceAll("'", "'\"'\"'")}'`
 }
 
 export function toolText(result: Awaited<ReturnType<Client["callTool"]>>): string {

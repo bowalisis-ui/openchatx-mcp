@@ -1,17 +1,25 @@
 import assert from "node:assert/strict"
+import process from "node:process"
 import test from "node:test"
 
 import { Client } from "@modelcontextprotocol/client"
 import { InMemoryTransport, McpServer } from "@modelcontextprotocol/server"
 
+import { defaultShellPath, resolveConfiguredShell } from "../src/host-platform.js"
 import {
   InteractiveShellManager,
   registerTerminalTool,
 } from "../src/tools/shell/interactive-shell.js"
 import { tempDir } from "./helpers/temp.js"
 
+function promptCommand(): string {
+  return process.platform === "win32"
+    ? `$name = Read-Host 'Name'; Write-Output "HELLO:$name"`
+    : "test -t 0 && test -t 1 && printf 'Name: '; read name; echo HELLO:$name"
+}
+
 async function connectedInteractiveShell(t: test.TestContext, cwd: string) {
-  const manager = new InteractiveShellManager(cwd, "/bin/zsh")
+  const manager = new InteractiveShellManager(cwd, resolveConfiguredShell(defaultShellPath()))
   const server = new McpServer({ name: "interactive-shell-test", version: "1.0.0" })
   const client = new Client({ name: "interactive-shell-client", version: "1.0.0" })
   registerTerminalTool(server, manager)
@@ -21,7 +29,9 @@ async function connectedInteractiveShell(t: test.TestContext, cwd: string) {
   return client
 }
 
-test("interactive shell provides a real TTY and accepts follow-up input", async (t) => {
+test("interactive shell provides a real TTY and accepts follow-up input", {
+  skip: process.platform === "win32",
+}, async (t) => {
   const cwd = await tempDir(t, "openchatx-interactive-")
   const client = await connectedInteractiveShell(t, cwd)
 
@@ -30,7 +40,7 @@ test("interactive shell provides a real TTY and accepts follow-up input", async 
     arguments: {
       action: "create",
       session_id: "prompt-test",
-      command: "test -t 0 && test -t 1 && printf 'Name: '; read name; echo HELLO:$name",
+      command: promptCommand(),
       wait_ms: 300,
     },
   })
@@ -64,7 +74,9 @@ test("interactive shell provides a real TTY and accepts follow-up input", async 
   assert.match(combined, /HELLO:Alice/u)
 })
 
-test("interactive shell sessions can be closed", async (t) => {
+test("interactive shell sessions can be closed", {
+  skip: process.platform === "win32",
+}, async (t) => {
   const cwd = await tempDir(t, "openchatx-interactive-list-")
   const client = await connectedInteractiveShell(t, cwd)
   await client.callTool({

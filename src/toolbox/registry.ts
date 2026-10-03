@@ -591,11 +591,20 @@ function toolboxIsDynamic(box: LoadedToolbox): boolean {
 
 async function loadTsTool(sourcePath: string): Promise<Tool> {
   const source = await readFile(sourcePath, "utf8")
-  const output = stripTypeScriptTypes(source, {
-    mode: "transform",
-    sourceMap: false,
-    sourceUrl: sourcePath,
-  })
+  let output: string
+  try {
+    output = stripTypeScriptTypes(source, {
+      mode: "strip",
+      sourceMap: false,
+      sourceUrl: sourcePath,
+    })
+  } catch {
+    output = stripTypeScriptTypes(source, {
+      mode: "transform",
+      sourceMap: false,
+      sourceUrl: sourcePath,
+    })
+  }
   const runtimePath = sourcePath.replace(TS_EXTENSION_RE, ".openchatx.mjs")
   await writeFile(runtimePath, output, "utf8")
   const href = `${pathToFileURL(runtimePath).href}?v=${Date.now()}`

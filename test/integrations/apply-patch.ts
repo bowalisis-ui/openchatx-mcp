@@ -4,10 +4,11 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import process from "node:process"
 import test from "node:test"
-import { applyPatch } from "../../src/tools/apply-patch/apply-patch.js"
+import { applyPatch, isApplyPatchSupported } from "../../src/tools/apply-patch/apply-patch.js"
 import { connectClient, startMcpHttpServer, toolText } from "./helpers.js"
 
 test("applies real patches and reports partial native changes through MCP", {
+  skip: !isApplyPatchSupported(),
   timeout: 20_000,
 }, async (t) => {
   const directory = await realpath(await mkdtemp(join(tmpdir(), "mcp-patch-result-")))
@@ -74,7 +75,10 @@ test("applies real patches and reports partial native changes through MCP", {
   assert.equal(await readFile(join(project, "nested/a.txt"), "utf8"), "one\ntwo\nthree\n")
 })
 
-test("rejects a nonexistent apply_patch cwd clearly", { timeout: 10_000 }, async (t) => {
+test("rejects a nonexistent apply_patch cwd clearly", {
+  skip: !isApplyPatchSupported(),
+  timeout: 10_000,
+}, async (t) => {
   const running = await startMcpHttpServer()
   t.after(() => running.close())
   const connected = await connectClient(running.url, "patch-missing-cwd-client")
@@ -96,7 +100,7 @@ test("rejects a nonexistent apply_patch cwd clearly", { timeout: 10_000 }, async
 })
 
 test("aborting applyPatch force-kills a SIGTERM-resistant child", {
-  skip: process.platform === "win32",
+  skip: !isApplyPatchSupported(),
   timeout: 10_000,
 }, async (t) => {
   const directory = await realpath(await mkdtemp(join(tmpdir(), "mcp-aborted-patch-")))

@@ -5,11 +5,14 @@ import { join } from "node:path"
 import test from "node:test"
 import { fileURLToPath } from "node:url"
 
+import { isApplyPatchSupported } from "../src/tools/apply-patch/apply-patch.js"
 import { tempDir } from "./helpers/temp.js"
 
 const applyPatch = fileURLToPath(new URL("../vendor/apply-patch/apply_patch", import.meta.url))
 
-test("executes the vendored apply_patch binary on the host architecture", async (t) => {
+test("executes the vendored apply_patch binary on the host architecture", {
+  skip: !isApplyPatchSupported(),
+}, async (t) => {
   const cwd = await tempDir(t, "apply-patch-vendor-")
   const result = spawnSync(applyPatch, [], {
     cwd,
