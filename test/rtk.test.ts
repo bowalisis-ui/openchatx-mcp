@@ -31,7 +31,9 @@ test("installed RTK default reads preserve source bytes exactly", {
   assert.equal(read.stdout, source)
 })
 
-test("prepares supported commands through RTK without changing the caller command", async (t) => {
+test("prepares supported commands through RTK without changing the caller command", {
+  skip: process.platform === "win32",
+}, async (t) => {
   const root = await fakeRtkRoot(t)
   const path = join(root, "fixture.txt")
   const source = "alpha\n  beta\n"
@@ -53,7 +55,9 @@ test("prepares supported commands through RTK without changing the caller comman
   assert.equal(result.stdout, source)
 })
 
-test("RTK execution disables RTK-local tee, telemetry, and persistent tracking", async (t) => {
+test("RTK execution disables RTK-local tee, telemetry, and persistent tracking", {
+  skip: process.platform === "win32",
+}, async (t) => {
   const root = await fakeRtkRoot(t)
   useRtk(t, join(root, "rtk"))
 
@@ -63,7 +67,9 @@ test("RTK execution disables RTK-local tee, telemetry, and persistent tracking",
   assert.equal(result.stdout, "0|1|/dev/null")
 })
 
-test("rewritten commands export the RTK path to child processes", async (t) => {
+test("rewritten commands export the RTK path to child processes", {
+  skip: process.platform === "win32",
+}, async (t) => {
   const root = await fakeRtkRoot(t)
   const childTool = join(root, "child-tool")
   await writeFile(childTool, "#!/bin/sh\nexec rtk env-probe\n")

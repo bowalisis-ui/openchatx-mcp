@@ -38,13 +38,7 @@ export function printPreflightErrors() {}`
   await writeFile(join(root, "agent-commands.yaml"), "previous audit\n")
   await writeFile(join(root, "calls.jsonl"), "")
 
-  for (const [command, path] of [
-    ["npm", "bin/npm"],
-    ["pm2", "node_modules/pm2/bin/pm2"],
-  ]) {
-    await writeFile(
-      join(root, path!),
-      `#!/usr/bin/env node
+  const fakeCommandSource = (command: string) => `#!/usr/bin/env node
 import { appendFileSync, existsSync } from "node:fs";
 const args = process.argv.slice(2);
 appendFileSync(${JSON.stringify(join(root, "calls.jsonl"))}, JSON.stringify({
@@ -52,10 +46,19 @@ appendFileSync(${JSON.stringify(join(root, "calls.jsonl"))}, JSON.stringify({
   pm2Home: process.env.PM2_HOME, cwd: process.cwd()
 }) + "\\n");
 if ([${JSON.stringify(command)} + " " + args[0], ${JSON.stringify(command)} + " " + args.join(" ")].includes(process.env.START_TEST_FAIL)) process.exit(7);
-`,
-      { mode: 0o755 }
+`
+
+  if (process.platform === "win32") {
+    const npmFixture = join(root, "bin", "npm-fixture.mjs")
+    await writeFile(npmFixture, fakeCommandSource("npm"))
+    await writeFile(
+      join(root, "bin", "npm.cmd"),
+      `@echo off\r\n"${process.execPath}" "${npmFixture}" %*\r\nexit /b %ERRORLEVEL%\r\n`
     )
+  } else {
+    await writeFile(join(root, "bin", "npm"), fakeCommandSource("npm"), { mode: 0o755 })
   }
+  await writeFile(join(root, "node_modules/pm2/bin/pm2"), fakeCommandSource("pm2"), { mode: 0o755 })
 
   const result = spawnSync(
     process.execPath,

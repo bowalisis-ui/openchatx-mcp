@@ -16,5 +16,8 @@ toolboxes/**/*.openchatx.mjs
 /wiki/_private/
 /test/live/artifacts/
 MEMORY.md
+/ANTIGRAVITY_STATE.md
 
 t.*
+desktop.ini
+/toolboxes/system-info/
