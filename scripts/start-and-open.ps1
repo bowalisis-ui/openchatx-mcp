@@ -1,3 +1,7 @@
+param(
+    [switch]$NoBrowser
+)
+
 if (-not $env:CONTROL_PLANE_API_KEY) {
     $userKey = [Environment]::GetEnvironmentVariable("CONTROL_PLANE_API_KEY", "User")
     if ($userKey) {
@@ -31,5 +35,7 @@ if (-not $isHealthy) {
     Write-Host "[OpenChatX] Services are already running." -ForegroundColor Green
 }
 
-Write-Host "[OpenChatX] Opening Dashboard in browser..." -ForegroundColor Green
-Start-Process "http://127.0.0.1:8001/ui"
+if (-not $NoBrowser) {
+    Write-Host "[OpenChatX] Opening Dashboard in browser..." -ForegroundColor Green
+    Start-Process "http://127.0.0.1:8001/ui"
+}
